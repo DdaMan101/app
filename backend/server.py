@@ -23,6 +23,31 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'afewgoodmen_db')]
 
+# Helper to clean MongoDB documents (remove ObjectId, convert datetime)
+def clean_doc(doc):
+    """Remove MongoDB _id and convert ObjectId/datetime to strings"""
+    if doc is None:
+        return None
+    if isinstance(doc, list):
+        return [clean_doc(d) for d in doc]
+    if isinstance(doc, dict):
+        cleaned = {}
+        for k, v in doc.items():
+            if k == '_id':
+                continue  # Skip MongoDB _id
+            elif hasattr(v, '__str__') and type(v).__name__ == 'ObjectId':
+                cleaned[k] = str(v)
+            elif isinstance(v, datetime):
+                cleaned[k] = v.isoformat()
+            elif isinstance(v, dict):
+                cleaned[k] = clean_doc(v)
+            elif isinstance(v, list):
+                cleaned[k] = [clean_doc(item) if isinstance(item, dict) else item for item in v]
+            else:
+                cleaned[k] = v
+        return cleaned
+    return doc
+
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'afewgoodmen_secret_key_2024')
 JWT_ALGORITHM = "HS256"
