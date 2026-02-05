@@ -1,30 +1,31 @@
-import { Text, View, StyleSheet, Image } from "react-native";
-
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuthStore } from '../src/store/authStore';
+import { COLORS, SPACING, FONT_SIZES } from '../src/constants/theme';
+import { LoadingScreen } from '../src/components/LoadingScreen';
 
 export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
+  const { isLoading, isAuthenticated, user, loadAuth } = useAuthStore();
+  const router = useRouter();
 
-  return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
-    </View>
-  );
+  useEffect(() => {
+    loadAuth();
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (!isAuthenticated) {
+      router.replace('/(auth)/login');
+    } else if (user?.role === 'talent') {
+      router.replace('/(talent)/dashboard');
+    } else if (user?.role === 'production') {
+      router.replace('/(production)/browse');
+    } else if (user?.role === 'admin') {
+      router.replace('/(admin)/dashboard');
+    }
+  }, [isLoading, isAuthenticated, user]);
+
+  return <LoadingScreen message="A Few Good Men Casting" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0c0c0c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-});
