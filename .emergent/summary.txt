@@ -1,0 +1,250 @@
+<analysis>
+<original_problem_statement>
+The user wants to build a comprehensive, three-sided mobile application for their talent agency, A Few Good Men Casting.
+
+**PRODUCT REQUIREMENTS:**
+
+1.  **Talent Portal:**
+    *   Talent can log in to a personal profile.
+    *   Manage personal details, physical stats (height, weight, shoe size), and photos.
+    *   An availability calendar to mark days they are unavailable.
+    *   View current availability checks and respond (Yes/No/Maybe).
+    *   View current and past job bookings.
+    *   View payment history with detailed breakdowns (chits).
+    *   Query pay and have it amended by admins.
+
+2.  **Production Portal:**
+    *   Productions can log in to browse the talent database.
+    *   Filter talent based on various criteria (height, sex, etc.).
+    *   Select talent using a Tinder-style swipe interface (thumbs up to select).
+    *   Create production projects, add dates, and specify job details.
+
+3.  **Admin/Back Office Portal:**
+    *   View incoming jobs and selections from productions.
+    *   Manage and assist with payment chits and talent financing.
+    *   Liaise with productions to select and send availability checks to talent.
+    *   A built-in messaging system for communication with talent and productions.
+    *   Ability to send broadcast messages to all talents with a specific skill.
+    *   Manage and update predetermined pay rates (e.g., FAA, PACT).
+    *   Ability to edit talent's star ratings as well as any profile. Also ability to delete and approve photos. 
+
+4.  **Referral & Quality Control System:**
+    *   Talent sign-up is by referral only. The main sign-up page should be locked.
+    *   New talents must enter two 4-digit referral codes from two different existing talents to unlock the sign-up page.
+    *   Existing talents can generate and share these 4-digit codes from their dashboard.
+    *   The system must track who referred whom.
+    *   A 5-star rating system for each talent, visible to admins and productions.
+    *   New talents start with 3 stars.
+    *   Admins can adjust the star ratings.
+
+5.  **Branding & UI:**
+    *   The company logo should be on the splash screen and in the header of all pages.
+    *   The initial splash screen should have three main buttons: Admin, Talent, and Production.
+
+</original_problem_statement>
+
+**User's preferred language**: English
+
+**what currently exists?**
+A full-stack application has been scaffolded using a FastAPI backend and an Expo (React Native) frontend.
+-   **Backend**: A comprehensive  file exists with Pydantic models for Users, Talent Profiles, Jobs, Payments, Messages, and more. It includes JWT-based authentication for the three roles (Admin, Talent, Production) and numerous CRUD API endpoints. A critical bug related to MongoDB ObjectId serialization has been fixed by implementing a  helper function across most endpoints. Backend endpoints for the new referral system have been added.
+-   **Frontend**: A file-based routing structure is in place using . Screens for all three roles (, , ) and authentication () have been created. The initial splash screen () is built with role-selection buttons and the company logo. New screens for the referral code flow (, ) have also been created.
+-   **Data**: Test accounts for all three roles have been created and the database has been seeded with standard pay rates.
+
+**Last working item**:
+    - Last item agent was working: The agent was in the middle of implementing the new talent referral and star rating system. The backend models and API endpoints (, ) have been created. On the frontend, the agent created the new screens for entering referral codes and the subsequent registration form. The agent's final step was to start creating the UI components for the star rating and the referral code generation on the existing talent's dashboard.
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use? both
+    - User Testing Done: N
+
+**All Pending/In progress Issue list**:
+  Issue 1:  (P0) The ObjectId serialization fix may be incomplete. The agent applied the  helper function to many endpoints, but a full audit is required to ensure it has been applied to *every* database query that returns data to the frontend. Any missed endpoint will likely cause a crash.
+
+  Issues Detail:
+  - Issue 1: 
+     - Attempted fixes: The agent created a  helper and manually applied it to numerous  and  calls in .
+     - Next debug checklist: 
+        1. Search  for all instances of  and .
+        2. Verify that the result of each query is passed through the  function or a list comprehension  before being returned in the .
+        3. Pay special attention to endpoints in the admin, production, and talent dashboards that fetch lists of data.
+     - Why fix this issue and what will be achieved with the fix? Failing to fix this will result in  responses on the frontend whenever data with a MongoDB  is fetched, making large parts of the app unusable.
+     - Status:  IN PROGRESS
+     - Is recurring issue? Y
+     - Should Test frontend/backend/both after fix? backend
+     - Blocked on other issue: None
+
+**In progress Task List**:
+  Task 1:  (P0) Complete the Talent Referral and Star Rating System UI.
+  
+ Task Detail:
+  - Task 1: 
+     - Where to resume: 
+        1. Create a new reusable component: . This component should display 5 stars (filled or hollow) and allow admins to change the rating.
+        2. Create a new screen or component for existing talents to generate/view their referral codes. This should be added to the  dashboard, likely in a new file like .
+        3. Integrate the  component into the talent profile view for Admins and Productions.
+        4. Connect the frontend UI to the backend referral endpoints (, ).
+     - What will be achieved with this? This will complete the referral and quality control feature requested by the user, a critical gatekeeping mechanism for the platform.
+     - Status:  IN PROGRESS
+     - Should Test frontend/backend/both after fix? both
+     - Blocked on something: None
+
+**Upcoming and Future Tasks**
+    - **P1: Implement Super 7 Availability Check Flow:** The backend model and response endpoint exist. The UI for admins to create/send checks and for talent to view/respond needs to be built.
+    - **P1: Implement Tinder-Style Talent Selection:** The  component exists as a placeholder. It needs to be populated with real talent data and integrated into the Production user's workflow to allow swiping, which should link to a selected list for a job.
+    - **P2: Build In-App Messaging UI:** Backend models and endpoints are in place. A full messaging interface needs to be built on the frontend, potentially using  for real-time updates.
+    - **P2: Build Talent Availability Calendar:** The data model supports it, but the UI component for talent to select and save their unavailable dates needs to be created.
+    - **P2: Build Payment & Chits UI:** The backend is ready. The UI for admins to manage payments and for talent to view their payment history and breakdowns needs to be built.
+    - **P3: Build Send to All Broadcast UI:** The backend endpoint exists. The Admin dashboard needs a UI to compose and send a broadcast message based on talent skills.
+    - **P3: Address OneDrive Export Request:** The user asked to export the whole thing onto my one drive. This was answered with instructions on how to download the code, but the user may have meant data export (e.g., CSV of talents). This needs clarification.
+
+**Completed work in this session**
+- **Backend Architecture**: Set up a FastAPI server with a comprehensive set of Pydantic models and API endpoints for all core features.
+- **Frontend Scaffolding**: Established an Expo project with  and created placeholder screens for all user roles and features.
+- **Authentication**: Implemented JWT authentication for Admin, Talent, and Production roles.
+- **Bug Fix**: Resolved a critical backend issue by creating and applying a  helper to handle MongoDB ObjectId serialization.
+- **UI/Branding**: Created the main splash screen with role-based navigation and integrated the user's logo.
+- **Seeding**: Created test user accounts and seeded the database with initial pay rate data.
+- **Referral System (Backend)**: Added models and API endpoints to support the two-code talent referral system.
+- **Referral System (Frontend)**: Created the initial screens for the new talent sign-up flow (, ).
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Backend**: FastAPI, Python, MongoDB (via ), Pydantic for data validation, JWT for authentication.
+- **Frontend**: React Native, Expo, TypeScript, Expo Router for file-based routing.
+- **State Management**: React Context () is used for authentication state.
+- **Architecture**: Full-stack monorepo structure with a clear separation between the  and  directories.
+
+**key DB schema**
+(Based on Pydantic models in )
+  - **users**: 
+  - **talent_profiles**: 
+  - **jobs**: 
+  - **availability_checks**: 
+  - **rates**: 
+  - **payments**: 
+  - **messages**: 
+
+**All files of reference**
+- : The single source of truth for all backend logic, models, and API endpoints. It was heavily modified to add features and fix the ObjectId bug.
+- : The splash screen. Updated to include the logo and three role buttons.
+- : The root layout file. Updated to include the  provider and a persistent header with the logo.
+- : Modified to change the Sign Up link to Enter Codes for the talent role.
+- : New file created to handle the two-referral-code entry step.
+- : New file for the talent registration form, accessible only after code validation.
+- : Manages user session and authentication state.
+- : New component to display the company logo.
+
+**Critical Info for New Agent**
+- The user is highly engaged and provides new requirements frequently, often interrupting ongoing work. Be prepared to pivot and reprioritize tasks.
+- The  helper function in  is critical. Any new endpoint that fetches data from MongoDB and sends it to the frontend MUST use this utility to convert  to a string to prevent app crashes.
+- The sign-up flow for talent has fundamentally changed. It is now locked behind a two-referral-code system. Do not re-implement a public sign-up.
+
+**Last 10 User Messages and any pending HUMAN messages**
+1.  **User (Msg 130)**: Requested a major new feature: a referral-only sign-up system for talent requiring two 4-digit codes, a star-rating system for talent, and tracking of who referred whom. (IN PROGRESS)
+2.  **User (Msg 124)**: Asked how to log in to the preview to test the application. (COMPLETED - Agent provided credentials).
+3.  **User (Msg 97)**: Provided the company logo as a JPEG file. (COMPLETED - Agent integrated it).
+4.  **User (Msg 94)**: Requested the company logo on the main page and all headers, and asked how to export the project to OneDrive. (COMPLETED - Logo integrated, export explained).
+5.  **User (Msg 57)**: Answered clarifying questions about the Super 7 and the splash screen button behavior. (COMPLETED - Agent incorporated this).
+6.  **User (Msg 50)**: Requested a new splash screen with 3 buttons and provided details on the Super 7 availability check workflow. (COMPLETED - Agent implemented splash screen and planned for Super 7).
+
+**Project Health Check:**
+-   **Broken**: The ObjectId serialization issue might still exist in untested endpoints. The connection between many frontend screens and backend APIs is not yet implemented, so navigating the app will lead to dead ends or non-functional pages.
+-   **Mocked**: No data is being mocked. The app relies on a live backend and database.
+
+**3rd Party Integrations**
+- None currently implemented.
+
+**Testing status**
+  - Testing agent used after significant changes: NO
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: None
+  - Known regressions: None
+
+**Credentials to test flow:**
+| Role       | Email              | Password |
+|------------|--------------------|----------|
+| **Admin**  |    |   |
+| **Talent** |   |   |
+| **Production**| |   |
+
+**What agent forgot to execute**
+The agent wrote several new frontend files (, ) and edited another () but did not restart the 
+  Usage: expo [command] [options]
+
+  Options:
+  
+    -V, --version                     output the version number
+    --non-interactive                 Fail, if an interactive prompt would be required to continue.
+    -h, --help                        output usage information
+  
+  Commands:
+
+    init [name]                       Create a new Expo project
+    start [path]                      Start a local dev server for the app
+    start:web [path]                  Start a Webpack dev server for the web app
+    export [path]                     Export the static files of the app for hosting it on a web server
+    install [packages...]             Install a module or other package to a project
+    run:android [path]                Run the Android app binary locally
+    run:ios [path]                    Run the iOS app binary locally
+    send [path]                       Share the project's URL to an email address
+
+    login                             Login to an Expo account
+    logout                            Logout of an Expo account
+    register                          Sign up for a new Expo account
+    whoami                            Return the currently authenticated account
+
+    client:install:ios                Install Expo Go for iOS on the simulator
+    client:install:android            Install Expo Go for Android on a connected device or emulator
+
+    config [path]                     Show the project config
+    doctor [path]                     Diagnose issues with the project
+    upgrade [sdk-version]             Upgrade the project packages and config for the given SDK version
+
+    customize:web [path]              Eject the default web files for customization
+    prebuild [path]                   Create native iOS and Android project files before building natively.
+                                      Learn more: https://docs.expo.dev/workflow/customizing/
+
+    build:web [path]                  Build the web app for production
+
+    credentials:manager [path]        Superseded by eas credentials in eas-cli
+
+    url [path]                        Log a URL for opening the project in Expo Go
+    url:ipa [path]                    Log the download URL for the standalone iOS binary
+    url:apk [path]                    Log the download URL for the standalone Android binary
+
+    webhooks [path]                   List all webhooks for a project
+    webhooks:add [path]               Add a webhook to a project
+    webhooks:remove [path]            Delete a webhook
+    webhooks:update [path]            Update an existing webhook
+
+    build:ios [path]                  Superseded by eas build in eas-cli
+    build:android [path]              Superseded by eas build in eas-cli
+    build:status [path]               Superseded by eas build:list in eas-cli
+    eject [path]                      Superseded by expo prebuild
+    fetch:ios:certs [path]            Superseded by eas credentials in eas-cli
+    fetch:android:keystore [path]     Superseded by eas credentials in eas-cli
+    fetch:android:hashes [path]       Superseded by eas credentials in eas-cli
+    fetch:android:upload-cert [path]  Superseded by eas credentials in eas-cli
+    publish [path]                    Superseded by eas update in eas-cli
+    publish:set [path]                Superseded by eas update:republish in eas-cli
+    publish:rollback [path]           Superseded by eas update:republish in eas-cli
+    publish:history [path]            Superseded by eas update:list in eas-cli
+    publish:details [path]            Superseded by eas update:view in eas-cli
+    push:android:upload [path]        Superseded by eas credentials in eas-cli
+    push:android:show [path]          Superseded by eas credentials in eas-cli
+    push:android:clear [path]         Superseded by eas credentials in eas-cli
+    upload:android [path]             Superseded by eas submit in eas-cli
+    upload:ios [path]                 Superseded by eas submit in eas-cli
+    client:ios [path]                 Superseded by Expo Dev Clients
+
+[00:37:36]   Run a command with --help for more info 💡
+[00:37:36]     $ expo start --help
+[00:37:36] supervisor service afterward. The next agent must restart the service (expo: ERROR (not running)
+expo: started) to ensure these file changes are loaded by the Metro bundler and are visible in the preview.
+</analysis>
+<workspace_dir>
+/app
+</workspace_dir>
