@@ -167,6 +167,8 @@ class TalentProfile(BaseModel):
     emergency_contact: Optional[Dict[str, str]] = None
     # Star rating (1-5, default 3)
     star_rating: int = 3
+    # Captain status (admin-controlled only)
+    is_captain: bool = False
     # Referral tracking
     referrer_1_id: Optional[str] = None
     referrer_1_name: Optional[str] = None
