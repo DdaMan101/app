@@ -10,15 +10,9 @@ import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../src/constants/
 export default function ProductionSettingsScreen() {
   const { user, logout } = useAuthStore();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout },
-      ]
-    );
+  const handleLogout = async () => {
+    // For web, skip the alert confirmation
+    await logout();
   };
 
   return (
