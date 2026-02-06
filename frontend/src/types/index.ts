@@ -63,8 +63,26 @@ export interface TalentProfile {
   notes?: string;
   bank_details?: Record<string, string>;
   emergency_contact?: Record<string, string>;
+  // Star rating (1-5, default 3 for new talents)
+  star_rating?: number;
+  // Referral tracking
+  referrer_1_id?: string;
+  referrer_1_name?: string;
+  referrer_2_id?: string;
+  referrer_2_name?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ReferralCode {
+  id: string;
+  code: string;
+  generated_by_id: string;
+  generated_by_name: string;
+  used_by_id?: string;
+  is_used: boolean;
+  created_at: string;
+  used_at?: string;
 }
 
 export interface UnavailableDate {
