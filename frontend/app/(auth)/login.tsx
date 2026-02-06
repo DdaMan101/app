@@ -106,8 +106,16 @@ export default function LoginScreen() {
 
             <View style={styles.registerSection}>
               <Text style={styles.registerText}>Don't have an account?</Text>
-              <TouchableOpacity onPress={() => router.push({ pathname: '/(auth)/register', params: { role: selectedRole } })}>
-                <Text style={[styles.registerLink, { color: config.color }]}>Register</Text>
+              <TouchableOpacity onPress={() => {
+                if (selectedRole === 'talent') {
+                  router.push('/(auth)/enter-codes');
+                } else {
+                  router.push({ pathname: '/(auth)/register', params: { role: selectedRole } });
+                }
+              }}>
+                <Text style={[styles.registerLink, { color: config.color }]}>
+                  {selectedRole === 'talent' ? 'Enter Codes' : 'Register'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
