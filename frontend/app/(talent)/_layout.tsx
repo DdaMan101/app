@@ -80,6 +80,16 @@ export default function TalentLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="refer"
+        options={{
+          title: 'Refer',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="gift" size={size} color={color} />
+          ),
+          href: null, // Hide from tab bar - access via dashboard button
+        }}
+      />
     </Tabs>
   );
 }
