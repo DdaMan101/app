@@ -674,9 +674,9 @@ async def update_talent_job_status(job_id: str, talent_id: str, status: str, not
     for selection in job.get("selected_talents", []):
         if selection["talent_id"] == talent_id:
             selection["status"] = status
-            selection["response_date"] = datetime.utcnow()
+            selection["response_date"] = datetime.utcnow().isoformat()
             if notes:
-                selection["notes"] = notes
+                selection["response_notes"] = notes
             break
     
     await db.jobs.update_one(
@@ -685,6 +685,89 @@ async def update_talent_job_status(job_id: str, talent_id: str, status: str, not
     )
     
     return {"message": "Status updated"}
+
+@api_router.post("/jobs/{job_id}/respond")
+async def talent_respond_to_job(job_id: str, response: str, notes: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Talent responds to availability check with Yes/No/Maybe"""
+    if user["role"] != UserRole.TALENT.value:
+        raise HTTPException(status_code=403, detail="Only talents can respond to jobs")
+    
+    if response not in ["yes", "no", "maybe"]:
+        raise HTTPException(status_code=400, detail="Response must be 'yes', 'no', or 'maybe'")
+    
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Find and update talent's status
+    updated = False
+    for selection in job.get("selected_talents", []):
+        if selection["talent_id"] == user["id"]:
+            selection["status"] = response
+            selection["response_date"] = datetime.utcnow().isoformat()
+            if notes:
+                selection["response_notes"] = notes
+            updated = True
+            break
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="You are not selected for this job")
+    
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {"selected_talents": job["selected_talents"], "updated_at": datetime.utcnow()}}
+    )
+    
+    return {"message": f"Response '{response}' recorded"}
+
+# ===================== BROADCAST MESSAGE =====================
+
+class BroadcastMessage(BaseModel):
+    subject: str
+    content: str
+    skill_filter: Optional[str] = None  # Filter talents by skill
+    gender_filter: Optional[str] = None
+    job_id: Optional[str] = None
+
+@api_router.post("/messages/broadcast")
+async def send_broadcast_message(broadcast: BroadcastMessage, user: dict = Depends(get_current_user)):
+    """Send message to all talents or filtered by skills - Admin only"""
+    if user["role"] != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="Only admin can broadcast messages")
+    
+    # Build filter for talents
+    filter_query = {"role": UserRole.TALENT.value, "is_active": True}
+    
+    # Get all talent users
+    talent_users = await db.users.find(filter_query).to_list(10000)
+    
+    # If skill filter, filter by talent profiles
+    if broadcast.skill_filter:
+        skill_lower = broadcast.skill_filter.lower()
+        talent_ids = [t["id"] for t in talent_users]
+        profiles = await db.talent_profiles.find({
+            "user_id": {"$in": talent_ids},
+            "skills": {"$regex": skill_lower, "$options": "i"}
+        }).to_list(10000)
+        valid_user_ids = {p["user_id"] for p in profiles}
+        talent_users = [t for t in talent_users if t["id"] in valid_user_ids]
+    
+    # Send message to each talent
+    messages_sent = 0
+    for talent in talent_users:
+        message = Message(
+            recipient_id=talent["id"],
+            sender_id=user["id"],
+            sender_name=f"{user['first_name']} {user['last_name']}",
+            recipient_name=f"{talent['first_name']} {talent['last_name']}",
+            job_id=broadcast.job_id,
+            subject=broadcast.subject,
+            content=broadcast.content,
+        )
+        await db.messages.insert_one(message.dict())
+        messages_sent += 1
+    
+    return {"message": f"Broadcast sent to {messages_sent} talents"}
 
 # ===================== PAYMENT ROUTES =====================
 
