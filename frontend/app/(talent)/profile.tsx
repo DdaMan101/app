@@ -164,6 +164,38 @@ export default function TalentProfileScreen() {
         </Text>
         <Text style={styles.profileEmail}>{profile?.user_email}</Text>
 
+        {/* Referrers & Status Section */}
+        <Card style={styles.statusCard}>
+          {/* Captain Badge */}
+          {profile?.is_captain && (
+            <View style={styles.captainBadge}>
+              <Ionicons name="star" size={16} color="#FFD700" />
+              <Text style={styles.captainText}>Captain</Text>
+            </View>
+          )}
+
+          {/* Referrer Boxes */}
+          {(profile?.referrer_1_name || profile?.referrer_2_name) && (
+            <View style={styles.referrersSection}>
+              <Text style={styles.referrersTitle}>Referred By</Text>
+              <View style={styles.referrersRow}>
+                {profile?.referrer_1_name && (
+                  <View style={styles.referrerBox}>
+                    <Ionicons name="person-circle" size={24} color={COLORS.primary} />
+                    <Text style={styles.referrerName}>{profile.referrer_1_name}</Text>
+                  </View>
+                )}
+                {profile?.referrer_2_name && (
+                  <View style={styles.referrerBox}>
+                    <Ionicons name="person-circle" size={24} color={COLORS.primary} />
+                    <Text style={styles.referrerName}>{profile.referrer_2_name}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+        </Card>
+
         {/* Personal Details */}
         {renderSection('Personal Details', 'personal', (
           <>
