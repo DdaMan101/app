@@ -1,0 +1,15 @@
+diff --git a/frontend/app/index.tsx b/frontend/app/index.tsx
+index 098252d..913baeb 100644
+--- a/frontend/app/index.tsx
++++ b/frontend/app/index.tsx
+@@ -100,8 +100,8 @@ const styles = StyleSheet.create({
+     paddingBottom: SPACING.md,
+   },
+   logo: {
+-    width: width * 0.6,
+-    height: width * 0.5,
++    width: width * 0.5,
++    height: width * 0.4,
+   },
+   buttonsSection: {
+     flex: 1,
