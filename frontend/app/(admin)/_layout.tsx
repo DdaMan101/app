@@ -1,12 +1,13 @@
 import { Tabs } from 'expo-router';
+import { View, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../src/constants/theme';
+import { COLORS, SPACING } from '../../src/constants/theme';
 
 export default function AdminLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: COLORS.primary,
+        tabBarActiveTintColor: COLORS.secondary,
         tabBarInactiveTintColor: COLORS.textSecondary,
         tabBarStyle: {
           backgroundColor: COLORS.surface,
@@ -16,12 +17,22 @@ export default function AdminLayout() {
           paddingTop: 8,
         },
         headerStyle: {
-          backgroundColor: COLORS.primary,
+          backgroundColor: COLORS.surface,
         },
-        headerTintColor: COLORS.textLight,
+        headerTintColor: COLORS.text,
         headerTitleStyle: {
           fontWeight: 'bold',
+          color: COLORS.secondary,
         },
+        headerRight: () => (
+          <View style={styles.headerRight}>
+            <Image
+              source={require('../../assets/logo.jpeg')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+        ),
       }}
     >
       <Tabs.Screen
@@ -72,3 +83,13 @@ export default function AdminLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  headerRight: {
+    marginRight: SPACING.md,
+  },
+  logo: {
+    width: 45,
+    height: 36,
+  },
+});

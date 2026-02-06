@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,21 +50,16 @@ export default function SplashScreen() {
     <SafeAreaView style={styles.container}>
       {/* Logo Section */}
       <View style={styles.logoSection}>
-        <View style={styles.flagStripe}>
-          <View style={[styles.stripe, { backgroundColor: COLORS.primary }]} />
-          <View style={[styles.stripe, { backgroundColor: '#FFFFFF' }]} />
-          <View style={[styles.stripe, { backgroundColor: COLORS.secondary }]} />
-        </View>
-        <View style={styles.logoCircle}>
-          <Ionicons name="film" size={50} color={COLORS.primary} />
-        </View>
-        <Text style={styles.title}>A Few Good Men</Text>
-        <Text style={styles.subtitle}>CASTING</Text>
+        <Image
+          source={require('../assets/logo.jpeg')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
       </View>
 
       {/* Role Buttons */}
       <View style={styles.buttonsSection}>
-        <Text style={styles.selectText}>Select your role</Text>
+        <Text style={styles.selectText}>Select your role to continue</Text>
         
         {ROLES.map((role) => (
           <TouchableOpacity
@@ -97,50 +92,16 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#FFFFFF',
   },
   logoSection: {
     alignItems: 'center',
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
   },
-  flagStripe: {
-    flexDirection: 'row',
-    width: 120,
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: SPACING.lg,
-  },
-  stripe: {
-    flex: 1,
-  },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    marginBottom: SPACING.md,
-  },
-  title: {
-    fontSize: FONT_SIZES.title,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    letterSpacing: 1,
-  },
-  subtitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.secondary,
-    letterSpacing: 4,
-    marginTop: SPACING.xs,
+  logo: {
+    width: width * 0.6,
+    height: width * 0.5,
   },
   buttonsSection: {
     flex: 1,

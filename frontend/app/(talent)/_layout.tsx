@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
+import { View, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../src/constants/theme';
+import { COLORS, SPACING } from '../../src/constants/theme';
 
 export default function TalentLayout() {
   return (
@@ -16,12 +17,22 @@ export default function TalentLayout() {
           paddingTop: 8,
         },
         headerStyle: {
-          backgroundColor: COLORS.primary,
+          backgroundColor: COLORS.surface,
         },
-        headerTintColor: COLORS.textLight,
+        headerTintColor: COLORS.text,
         headerTitleStyle: {
           fontWeight: 'bold',
+          color: COLORS.primary,
         },
+        headerRight: () => (
+          <View style={styles.headerRight}>
+            <Image
+              source={require('../../assets/logo.jpeg')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+        ),
       }}
     >
       <Tabs.Screen
@@ -45,7 +56,7 @@ export default function TalentLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: 'Calendar',
+          title: 'Availability',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
           ),
@@ -72,3 +83,13 @@ export default function TalentLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  headerRight: {
+    marginRight: SPACING.md,
+  },
+  logo: {
+    width: 45,
+    height: 36,
+  },
+});
