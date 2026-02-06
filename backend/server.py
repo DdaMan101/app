@@ -198,22 +198,42 @@ class UnavailableDateCreate(BaseModel):
     reason: Optional[str] = None
 
 # Job Models
+class Super7AvailabilityCheck(BaseModel):
+    """The Super 7 - 7 pieces of info for availability checks"""
+    dates: List[str] = []  # Multiple dates
+    production_name: str  # Production name or working title
+    location: str  # e.g., Pinewood Studios
+    location_what3words: Optional[str] = None  # What3Words location
+    parking: bool = False  # Yes/No for parking available
+    parking_info: Optional[str] = None  # Nearest car park info if no parking
+    rate_of_pay: str  # e.g., "FAA/PACT 2023 Rates, Continuous"
+    captain: Optional[str] = None  # Contact person name
+    captain_phone: Optional[str] = None  # Captain contact
+    costume_character: Optional[str] = None  # Brief costume/character description
+    additional_info: Optional[str] = None  # OSS, continuous working day, etc.
+
 class TalentSelection(BaseModel):
     talent_id: str
     talent_name: str
-    status: str = "pending"  # pending, availability_sent, available, unavailable, confirmed, declined
+    status: str = "pending"  # pending, av_sent, yes, no, maybe, confirmed, declined
     response_date: Optional[datetime] = None
-    notes: Optional[str] = None
+    response_notes: Optional[str] = None
 
 class JobCreate(BaseModel):
     production_name: str
     project_title: str
     description: Optional[str] = None
     location: Optional[str] = None
+    location_what3words: Optional[str] = None
     rate_agreement: RateAgreement = RateAgreement.FAA_PACT
     dates_required: List[str] = []  # List of YYYY-MM-DD dates
     call_time: Optional[str] = None
     wrap_time: Optional[str] = None
+    parking_available: bool = False
+    parking_info: Optional[str] = None
+    captain_name: Optional[str] = None
+    captain_phone: Optional[str] = None
+    costume_notes: Optional[str] = None
     requirements: Optional[Dict[str, Any]] = None  # Filters like height, gender, etc.
     notes: Optional[str] = None
 
