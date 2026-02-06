@@ -165,8 +165,26 @@ class TalentProfile(BaseModel):
     notes: Optional[str] = None
     bank_details: Optional[Dict[str, str]] = None
     emergency_contact: Optional[Dict[str, str]] = None
+    # Star rating (1-5, default 3)
+    star_rating: int = 3
+    # Referral tracking
+    referrer_1_id: Optional[str] = None
+    referrer_1_name: Optional[str] = None
+    referrer_2_id: Optional[str] = None
+    referrer_2_name: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Referral Code Model
+class ReferralCode(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: str  # 4-digit code
+    generated_by_id: str  # Talent who created this code
+    generated_by_name: str
+    used_by_id: Optional[str] = None  # Talent who used this code
+    is_used: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    used_at: Optional[datetime] = None
 
 class TalentProfileUpdate(BaseModel):
     date_of_birth: Optional[str] = None
