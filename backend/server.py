@@ -1444,6 +1444,88 @@ async def get_talent_referrers(talent_id: str, user: dict = Depends(get_current_
         }
     }
 
+# ===================== PRODUCTION SELECTIONS =====================
+
+class ProductionSelection(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    production_user_id: str
+    production_name: str
+    selected_talent_ids: List[str]
+    target_count: int
+    status: str = "pending"  # pending, reviewed, confirmed
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+@api_router.post("/production/submit-selections")
+async def submit_production_selections(
+    data: dict,
+    user: dict = Depends(get_current_user)
+):
+    """Production submits their talent selections to AFGM admin"""
+    if user["role"] != UserRole.PRODUCTION.value:
+        raise HTTPException(status_code=403, detail="Only production users can submit selections")
+    
+    selected_ids = data.get("selected_talent_ids", [])
+    target_count = data.get("target_count", 10)
+    
+    if not selected_ids:
+        raise HTTPException(status_code=400, detail="No talents selected")
+    
+    # Create selection record
+    selection = ProductionSelection(
+        production_user_id=user["id"],
+        production_name=f"{user['first_name']} {user['last_name']}",
+        selected_talent_ids=selected_ids,
+        target_count=target_count
+    )
+    
+    await db.production_selections.insert_one(selection.dict())
+    
+    # Create notification message for admin
+    admin_message = Message(
+        sender_id=user["id"],
+        recipient_id="admin",  # Special recipient for admin team
+        content=f"New talent selection from {user['first_name']} {user['last_name']}: {len(selected_ids)} talents selected (target: {target_count})",
+        is_read=False
+    )
+    await db.messages.insert_one(admin_message.dict())
+    
+    return {
+        "message": "Selections submitted successfully",
+        "selection_id": selection.id,
+        "selected_count": len(selected_ids),
+        "target_count": target_count
+    }
+
+@api_router.get("/admin/production-selections")
+async def get_production_selections(user: dict = Depends(get_current_user)):
+    """Admin views all production selections"""
+    if user["role"] != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    cursor = db.production_selections.find().sort("created_at", -1)
+    selections = await cursor.to_list(100)
+    
+    # Enrich with talent info
+    result = []
+    for sel in selections:
+        sel = clean_doc(sel)
+        # Get talent details for each selection
+        talent_details = []
+        for talent_id in sel.get("selected_talent_ids", []):
+            talent = await db.talent_profiles.find_one({"user_id": talent_id})
+            if talent:
+                talent = clean_doc(talent)
+                user_info = await db.users.find_one({"id": talent_id})
+                if user_info:
+                    talent["user_first_name"] = user_info.get("first_name")
+                    talent["user_last_name"] = user_info.get("last_name")
+                talent_details.append(talent)
+        sel["talents"] = talent_details
+        result.append(sel)
+    
+    return result
+
 # ===================== HEALTH CHECK =====================
 
 @api_router.get("/")
