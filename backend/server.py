@@ -397,14 +397,95 @@ async def register(user_data: UserCreate):
     
     return TokenResponse(access_token=token, user=user_response)
 
-@api_router.post("/auth/login", response_model=TokenResponse)
-async def login(credentials: UserLogin):
+# Store for 2FA codes (in production, use Redis with expiry)
+two_fa_codes = {}
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+    expected_role: Optional[str] = None  # Role user is trying to login as
+
+class TwoFAVerifyRequest(BaseModel):
+    email: str
+    code: str
+
+@api_router.post("/auth/login")
+async def login(credentials: LoginRequest):
     user = await db.users.find_one({"email": credentials.email})
     if not user or not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="Account is deactivated")
+    
+    # Role validation - if expected_role is provided, check it matches
+    if credentials.expected_role:
+        if user["role"] != credentials.expected_role:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Access denied. This account is registered as {user['role'].title()}, not {credentials.expected_role.title()}."
+            )
+    
+    # For talents, require 2FA
+    if user["role"] == UserRole.TALENT.value:
+        # Generate 6-digit code
+        code = str(random.randint(100000, 999999))
+        
+        # Store code with timestamp (expires in 10 minutes)
+        two_fa_codes[credentials.email] = {
+            "code": code,
+            "expires": datetime.utcnow() + timedelta(minutes=10),
+            "user_id": user["id"]
+        }
+        
+        # In production, send email here. For now, log it and return
+        print(f"2FA Code for {credentials.email}: {code}")
+        
+        return {
+            "requires_2fa": True,
+            "message": f"A verification code has been sent to {credentials.email}",
+            "email": credentials.email
+        }
+    
+    # For admin and production, direct login
+    token = create_token(user["id"], user["role"])
+    
+    user_response = UserResponse(
+        id=user["id"],
+        email=user["email"],
+        first_name=user["first_name"],
+        last_name=user["last_name"],
+        phone=user.get("phone"),
+        role=user["role"],
+        created_at=user["created_at"],
+        is_active=user.get("is_active", True),
+        company_name=user.get("company_name")
+    )
+    
+    return {"access_token": token, "token_type": "bearer", "user": user_response.dict()}
+
+@api_router.post("/auth/verify-2fa")
+async def verify_two_fa(data: TwoFAVerifyRequest):
+    """Verify 2FA code for talent login"""
+    stored = two_fa_codes.get(data.email)
+    
+    if not stored:
+        raise HTTPException(status_code=400, detail="No verification code found. Please login again.")
+    
+    if datetime.utcnow() > stored["expires"]:
+        del two_fa_codes[data.email]
+        raise HTTPException(status_code=400, detail="Verification code expired. Please login again.")
+    
+    if stored["code"] != data.code:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    # Code is valid - complete login
+    user = await db.users.find_one({"id": stored["user_id"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Clean up code
+    del two_fa_codes[data.email]
     
     token = create_token(user["id"], user["role"])
     
@@ -420,7 +501,26 @@ async def login(credentials: UserLogin):
         company_name=user.get("company_name")
     )
     
-    return TokenResponse(access_token=token, user=user_response)
+    return {"access_token": token, "token_type": "bearer", "user": user_response.dict()}
+
+@api_router.post("/auth/resend-2fa")
+async def resend_two_fa(email: str):
+    """Resend 2FA code"""
+    user = await db.users.find_one({"email": email})
+    if not user or user["role"] != UserRole.TALENT.value:
+        raise HTTPException(status_code=400, detail="Invalid request")
+    
+    # Generate new code
+    code = str(random.randint(100000, 999999))
+    two_fa_codes[email] = {
+        "code": code,
+        "expires": datetime.utcnow() + timedelta(minutes=10),
+        "user_id": user["id"]
+    }
+    
+    print(f"2FA Code resent for {email}: {code}")
+    
+    return {"message": f"New verification code sent to {email}"}
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(user: dict = Depends(get_current_user)):
