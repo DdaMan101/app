@@ -238,6 +238,8 @@ class APITester:
                     print_warning(f"Unexpected error message: {error_detail}")
             else:
                 print_error(f"Expected 400 error for same codes, got: {response.status_code if response else 'No response'}")
+                if response:
+                    print_error(f"Response content: {response.text}")
         
         # Test with non-existent codes (should fail)
         print_info("Testing with non-existent codes...")
