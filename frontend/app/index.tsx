@@ -100,8 +100,8 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
   },
   logo: {
-    width: width * 0.6,
-    height: width * 0.5,
+    width: width * 0.5,
+    height: width * 0.4,
   },
   buttonsSection: {
     flex: 1,
