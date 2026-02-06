@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
   Alert,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,20 +19,34 @@ import { Card } from '../../src/components/Card';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { LoadingScreen } from '../../src/components/LoadingScreen';
+import { StarRating } from '../../src/components/StarRating';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../src/constants/theme';
 import api from '../../src/api/client';
 import { TalentProfile } from '../../src/types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
+const THUMBNAIL_SIZE = (SCREEN_WIDTH - SPACING.md * 4) / 3;
+
+type ViewMode = 'swipe' | 'thumbnail';
 
 export default function BrowseTalentScreen() {
   const [loading, setLoading] = useState(true);
   const [talents, setTalents] = useState<TalentProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedTalents, setSelectedTalents] = useState<string[]>([]);
+  const [selectedTalents, setSelectedTalents] = useState<Set<string>>(new Set());
+  const [rejectedTalents, setRejectedTalents] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [detailTalent, setDetailTalent] = useState<TalentProfile | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('swipe');
+  const [viewedAll, setViewedAll] = useState(false);
+  
+  // Selection counter
+  const [targetCount, setTargetCount] = useState(10);
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
 
   // Filters
   const [filterGender, setFilterGender] = useState<string | null>(null);
@@ -86,6 +101,14 @@ export default function BrowseTalentScreen() {
     fetchTalents();
   }, []);
 
+  // Check if viewed all talents
+  useEffect(() => {
+    if (talents.length > 0 && currentIndex >= talents.length && !viewedAll) {
+      setViewedAll(true);
+      setShowCompletionModal(true);
+    }
+  }, [currentIndex, talents.length]);
+
   const fetchTalents = async () => {
     setLoading(true);
     try {
@@ -98,6 +121,7 @@ export default function BrowseTalentScreen() {
       const response = await api.get(`/talents?${params.toString()}`);
       setTalents(response.data);
       setCurrentIndex(0);
+      setViewedAll(false);
     } catch (error) {
       console.error('Error fetching talents:', error);
     } finally {
@@ -112,10 +136,32 @@ export default function BrowseTalentScreen() {
     }).start();
   };
 
+  const selectTalent = (talentId: string) => {
+    const newSelected = new Set(selectedTalents);
+    newSelected.add(talentId);
+    setSelectedTalents(newSelected);
+    
+    // Remove from rejected if it was there
+    const newRejected = new Set(rejectedTalents);
+    newRejected.delete(talentId);
+    setRejectedTalents(newRejected);
+  };
+
+  const rejectTalent = (talentId: string) => {
+    const newRejected = new Set(rejectedTalents);
+    newRejected.add(talentId);
+    setRejectedTalents(newRejected);
+    
+    // Remove from selected if it was there
+    const newSelected = new Set(selectedTalents);
+    newSelected.delete(talentId);
+    setSelectedTalents(newSelected);
+  };
+
   const swipeRight = () => {
     const talent = talents[currentIndex];
     if (talent) {
-      setSelectedTalents([...selectedTalents, talent.user_id]);
+      selectTalent(talent.user_id);
     }
     Animated.timing(position, {
       toValue: { x: SCREEN_WIDTH + 100, y: 0 },
@@ -125,6 +171,10 @@ export default function BrowseTalentScreen() {
   };
 
   const swipeLeft = () => {
+    const talent = talents[currentIndex];
+    if (talent) {
+      rejectTalent(talent.user_id);
+    }
     Animated.timing(position, {
       toValue: { x: -SCREEN_WIDTH - 100, y: 0 },
       duration: 300,
@@ -151,6 +201,44 @@ export default function BrowseTalentScreen() {
     fetchTalents();
   };
 
+  const resetBrowsing = () => {
+    setCurrentIndex(0);
+    setViewedAll(false);
+    setShowCompletionModal(false);
+    position.setValue({ x: 0, y: 0 });
+  };
+
+  const handleSendToAFGM = async () => {
+    try {
+      // Send selections to backend
+      const selectedList = Array.from(selectedTalents);
+      await api.post('/production/submit-selections', {
+        selected_talent_ids: selectedList,
+        target_count: targetCount,
+      });
+      
+      setShowSendModal(false);
+      Alert.alert(
+        'Selections Sent!',
+        'Your selections have been sent to A Few Good Men Casting. The admin team has been notified.',
+        [{ text: 'OK', onPress: () => {
+          // Reset selections after sending
+          setSelectedTalents(new Set());
+          setRejectedTalents(new Set());
+          setCurrentIndex(0);
+          setViewedAll(false);
+        }}]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to send selections');
+    }
+  };
+
+  const openTalentDetail = (talent: TalentProfile) => {
+    setDetailTalent(talent);
+    setShowDetail(true);
+  };
+
   const currentTalent = talents[currentIndex];
   const nextTalent = talents[currentIndex + 1];
 
@@ -158,7 +246,7 @@ export default function BrowseTalentScreen() {
     return <LoadingScreen message="Loading talents..." />;
   }
 
-  const renderCard = (talent: TalentProfile, isTop: boolean = false) => {
+  const renderSwipeCard = (talent: TalentProfile, isTop: boolean = false) => {
     const cardStyle = isTop
       ? {
           transform: [
@@ -198,13 +286,26 @@ export default function BrowseTalentScreen() {
               <Ionicons name="person" size={80} color={COLORS.textSecondary} />
             </View>
           )}
+          
+          {/* Captain & Rating Badge */}
+          <View style={styles.badgesContainer}>
+            {talent.is_captain && (
+              <View style={styles.captainBadge}>
+                <Ionicons name="star" size={14} color="#FFD700" />
+                <Text style={styles.captainText}>Captain</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Info */}
         <View style={styles.cardInfo}>
-          <Text style={styles.talentName}>
-            {talent.user_first_name} {talent.user_last_name}
-          </Text>
+          <View style={styles.nameRatingRow}>
+            <Text style={styles.talentName}>
+              {talent.user_first_name} {talent.user_last_name}
+            </Text>
+            <StarRating rating={talent.star_rating || 3} size={14} />
+          </View>
           
           <View style={styles.statsRow}>
             {talent.physical_stats?.height_cm && (
@@ -219,25 +320,10 @@ export default function BrowseTalentScreen() {
                 <Text style={styles.statText}>{talent.appearance.gender}</Text>
               </View>
             )}
-            {talent.appearance?.hair_color && (
-              <View style={styles.stat}>
-                <Text style={styles.statText}>{talent.appearance.hair_color} Hair</Text>
-              </View>
-            )}
           </View>
 
-          {talent.skills && talent.skills.length > 0 && (
-            <View style={styles.skillsRow}>
-              {talent.skills.slice(0, 3).map((skill, i) => (
-                <View key={i} style={styles.skillChip}>
-                  <Text style={styles.skillText}>{skill}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
           {isTop && (
-            <TouchableOpacity style={styles.viewMore} onPress={() => setShowDetail(true)}>
+            <TouchableOpacity style={styles.viewMore} onPress={() => openTalentDetail(talent)}>
               <Text style={styles.viewMoreText}>View Full Profile</Text>
               <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
             </TouchableOpacity>
@@ -247,57 +333,259 @@ export default function BrowseTalentScreen() {
     );
   };
 
+  const renderThumbnailItem = ({ item: talent }: { item: TalentProfile }) => {
+    const isSelected = selectedTalents.has(talent.user_id);
+    const isRejected = rejectedTalents.has(talent.user_id);
+
+    return (
+      <TouchableOpacity
+        style={styles.thumbnailWrapper}
+        onPress={() => openTalentDetail(talent)}
+      >
+        <View style={[
+          styles.thumbnail,
+          isSelected && styles.thumbnailSelected,
+          isRejected && styles.thumbnailRejected,
+        ]}>
+          {talent.headshot_base64 ? (
+            <Image source={{ uri: talent.headshot_base64 }} style={styles.thumbnailImage} />
+          ) : (
+            <View style={styles.thumbnailPlaceholder}>
+              <Ionicons name="person" size={30} color={COLORS.textSecondary} />
+            </View>
+          )}
+          
+          {/* Selection indicator */}
+          {isSelected && (
+            <View style={styles.selectionBadge}>
+              <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+            </View>
+          )}
+          {isRejected && (
+            <View style={styles.selectionBadge}>
+              <Ionicons name="close-circle" size={24} color={COLORS.error} />
+            </View>
+          )}
+          
+          {/* Captain badge */}
+          {talent.is_captain && (
+            <View style={styles.thumbnailCaptain}>
+              <Ionicons name="star" size={12} color="#FFD700" />
+            </View>
+          )}
+        </View>
+        
+        <Text style={styles.thumbnailName} numberOfLines={1}>
+          {talent.user_first_name}
+        </Text>
+        <StarRating rating={talent.star_rating || 3} size={10} />
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      {/* Header with Filter */}
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {selectedTalents.length} Selected
-        </Text>
-        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
-          <Ionicons name="filter" size={20} color={COLORS.primary} />
-          <Text style={styles.filterButtonText}>Filter</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Cards Stack */}
-      <View style={styles.cardsContainer}>
-        {currentTalent ? (
-          <>
-            {nextTalent && renderCard(nextTalent, false)}
-            {renderCard(currentTalent, true)}
-          </>
-        ) : (
-          <Card style={styles.emptyCard}>
-            <Ionicons name="people-outline" size={60} color={COLORS.textSecondary} />
-            <Text style={styles.emptyTitle}>No More Talents</Text>
-            <Text style={styles.emptyText}>You've viewed all available talents</Text>
-            <Button
-              title="Reset & Browse Again"
-              onPress={() => {
-                setCurrentIndex(0);
-                fetchTalents();
-              }}
-              style={styles.resetButton}
-            />
-          </Card>
-        )}
-      </View>
-
-      {/* Action Buttons */}
-      {currentTalent && (
-        <View style={styles.actions}>
-          <TouchableOpacity style={[styles.actionButton, styles.passButton]} onPress={swipeLeft}>
-            <Ionicons name="close" size={32} color={COLORS.error} />
+        <View style={styles.counterSection}>
+          <TouchableOpacity style={styles.counterButton} onPress={() => setShowTargetModal(true)}>
+            <Text style={styles.counterText}>
+              {selectedTalents.size}/{targetCount}
+            </Text>
+            <Ionicons name="settings-outline" size={16} color={COLORS.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.infoButton]} onPress={() => setShowDetail(true)}>
-            <Ionicons name="information" size={24} color={COLORS.info} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.selectButton]} onPress={swipeRight}>
-            <Ionicons name="checkmark" size={32} color={COLORS.success} />
+          <Text style={styles.counterLabel}>Selected</Text>
+        </View>
+        
+        <View style={styles.headerButtons}>
+          {/* View Mode Toggle */}
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              style={[styles.toggleButton, viewMode === 'swipe' && styles.toggleButtonActive]}
+              onPress={() => setViewMode('swipe')}
+            >
+              <Ionicons name="layers" size={18} color={viewMode === 'swipe' ? COLORS.textLight : COLORS.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, viewMode === 'thumbnail' && styles.toggleButtonActive]}
+              onPress={() => setViewMode('thumbnail')}
+            >
+              <Ionicons name="grid" size={18} color={viewMode === 'thumbnail' ? COLORS.textLight : COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
+            <Ionicons name="filter" size={20} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Swipe View */}
+      {viewMode === 'swipe' && (
+        <>
+          <View style={styles.cardsContainer}>
+            {currentTalent ? (
+              <>
+                {nextTalent && renderSwipeCard(nextTalent, false)}
+                {renderSwipeCard(currentTalent, true)}
+              </>
+            ) : (
+              <Card style={styles.emptyCard}>
+                <Ionicons name="people-outline" size={60} color={COLORS.textSecondary} />
+                <Text style={styles.emptyTitle}>No More Talents</Text>
+                <Text style={styles.emptyText}>
+                  You've viewed all {talents.length} talents
+                </Text>
+                <Text style={styles.selectionSummary}>
+                  {selectedTalents.size}/{targetCount} selected
+                </Text>
+              </Card>
+            )}
+          </View>
+
+          {/* Swipe Action Buttons */}
+          {currentTalent && (
+            <View style={styles.actions}>
+              <TouchableOpacity style={[styles.actionButton, styles.passButton]} onPress={swipeLeft}>
+                <Ionicons name="close" size={32} color={COLORS.error} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, styles.infoButton]} onPress={() => openTalentDetail(currentTalent)}>
+                <Ionicons name="information" size={24} color={COLORS.info} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, styles.selectButton]} onPress={swipeRight}>
+                <Ionicons name="checkmark" size={32} color={COLORS.success} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
       )}
+
+      {/* Thumbnail View */}
+      {viewMode === 'thumbnail' && (
+        <FlatList
+          data={talents}
+          renderItem={renderThumbnailItem}
+          keyExtractor={(item) => item.id}
+          numColumns={3}
+          contentContainerStyle={styles.thumbnailGrid}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Send Button - visible when selections made */}
+      {selectedTalents.size > 0 && (
+        <TouchableOpacity
+          style={styles.sendFab}
+          onPress={() => setShowSendModal(true)}
+        >
+          <Ionicons name="send" size={24} color={COLORS.textLight} />
+          <Text style={styles.sendFabText}>{selectedTalents.size}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Target Count Modal */}
+      <Modal
+        visible={showTargetModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowTargetModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.targetModal}>
+            <Text style={styles.targetModalTitle}>How many people do you need?</Text>
+            <Input
+              value={targetCount.toString()}
+              onChangeText={(text) => setTargetCount(parseInt(text) || 1)}
+              keyboardType="numeric"
+              style={styles.targetInput}
+            />
+            <Button
+              title="Set Target"
+              onPress={() => setShowTargetModal(false)}
+              fullWidth
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Completion Modal */}
+      <Modal
+        visible={showCompletionModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowCompletionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.completionModal}>
+            <Ionicons name="checkmark-done-circle" size={60} color={COLORS.success} />
+            <Text style={styles.completionTitle}>That's it!</Text>
+            <Text style={styles.completionText}>You have seen everyone.</Text>
+            <View style={styles.completionCounter}>
+              <Text style={styles.completionCounterText}>
+                {selectedTalents.size}/{targetCount}
+              </Text>
+              <Text style={styles.completionCounterLabel}>selections</Text>
+            </View>
+            
+            {selectedTalents.size < targetCount && (
+              <Text style={styles.completionHint}>
+                You need {targetCount - selectedTalents.size} more to reach your target
+              </Text>
+            )}
+            
+            <View style={styles.completionActions}>
+              <Button
+                title="Scroll Again"
+                onPress={resetBrowsing}
+                variant="outline"
+                style={styles.completionAction}
+              />
+              <Button
+                title="Send to A.F.G.M"
+                onPress={() => {
+                  setShowCompletionModal(false);
+                  setShowSendModal(true);
+                }}
+                style={styles.completionAction}
+                disabled={selectedTalents.size === 0}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Send Confirmation Modal */}
+      <Modal
+        visible={showSendModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowSendModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.sendModal}>
+            <Ionicons name="paper-plane" size={50} color={COLORS.primary} />
+            <Text style={styles.sendModalTitle}>Send to A.F.G.M?</Text>
+            <Text style={styles.sendModalText}>
+              You've selected {selectedTalents.size} talent{selectedTalents.size !== 1 ? 's' : ''}.
+              This will notify the admin team.
+            </Text>
+            
+            <View style={styles.sendModalActions}>
+              <Button
+                title="Cancel"
+                onPress={() => setShowSendModal(false)}
+                variant="outline"
+                style={styles.sendModalAction}
+              />
+              <Button
+                title="Send"
+                onPress={handleSendToAFGM}
+                style={styles.sendModalAction}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Filter Modal */}
       <Modal
@@ -306,7 +594,7 @@ export default function BrowseTalentScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowFilters(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={styles.filterModalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Filter Talents</Text>
             <TouchableOpacity onPress={() => setShowFilters(false)}>
@@ -381,13 +669,13 @@ export default function BrowseTalentScreen() {
 
       {/* Detail Modal */}
       <Modal
-        visible={showDetail && currentTalent !== undefined}
+        visible={showDetail && detailTalent !== null}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowDetail(false)}
       >
-        {currentTalent && (
-          <SafeAreaView style={styles.modalContainer}>
+        {detailTalent && (
+          <SafeAreaView style={styles.filterModalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Talent Profile</Text>
               <TouchableOpacity onPress={() => setShowDetail(false)}>
@@ -396,10 +684,10 @@ export default function BrowseTalentScreen() {
             </View>
 
             <ScrollView style={styles.modalContent}>
-              {/* Photos */}
+              {/* Photo */}
               <View style={styles.detailPhotos}>
-                {currentTalent.headshot_base64 ? (
-                  <Image source={{ uri: currentTalent.headshot_base64 }} style={styles.detailPhoto} />
+                {detailTalent.headshot_base64 ? (
+                  <Image source={{ uri: detailTalent.headshot_base64 }} style={styles.detailPhoto} />
                 ) : (
                   <View style={[styles.detailPhoto, styles.noDetailPhoto]}>
                     <Ionicons name="person" size={60} color={COLORS.textSecondary} />
@@ -407,9 +695,18 @@ export default function BrowseTalentScreen() {
                 )}
               </View>
 
-              <Text style={styles.detailName}>
-                {currentTalent.user_first_name} {currentTalent.user_last_name}
-              </Text>
+              <View style={styles.detailHeader}>
+                <Text style={styles.detailName}>
+                  {detailTalent.user_first_name} {detailTalent.user_last_name}
+                </Text>
+                {detailTalent.is_captain && (
+                  <View style={styles.detailCaptainBadge}>
+                    <Ionicons name="star" size={14} color="#FFD700" />
+                    <Text style={styles.detailCaptainText}>Captain</Text>
+                  </View>
+                )}
+                <StarRating rating={detailTalent.star_rating || 3} size={20} />
+              </View>
 
               {/* Stats */}
               <Card style={styles.detailCard}>
@@ -417,33 +714,23 @@ export default function BrowseTalentScreen() {
                 <View style={styles.detailStats}>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Height</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.physical_stats?.height_cm || '-'}cm
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.physical_stats?.height_cm || '-'}cm</Text>
                   </View>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Weight</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.physical_stats?.weight_kg || '-'}kg
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.physical_stats?.weight_kg || '-'}kg</Text>
                   </View>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Chest</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.physical_stats?.chest_cm || '-'}cm
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.physical_stats?.chest_cm || '-'}cm</Text>
                   </View>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Waist</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.physical_stats?.waist_cm || '-'}cm
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.physical_stats?.waist_cm || '-'}cm</Text>
                   </View>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Shoe Size</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.physical_stats?.shoe_size_uk || '-'}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.physical_stats?.shoe_size_uk || '-'}</Text>
                   </View>
                 </View>
               </Card>
@@ -453,36 +740,28 @@ export default function BrowseTalentScreen() {
                 <View style={styles.detailStats}>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Gender</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.appearance?.gender || '-'}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.appearance?.gender || '-'}</Text>
                   </View>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Hair</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.appearance?.hair_color || '-'}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.appearance?.hair_color || '-'}</Text>
                   </View>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Eyes</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.appearance?.eye_color || '-'}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.appearance?.eye_color || '-'}</Text>
                   </View>
                   <View style={styles.detailStat}>
                     <Text style={styles.detailStatLabel}>Ethnicity</Text>
-                    <Text style={styles.detailStatValue}>
-                      {currentTalent.appearance?.ethnicity || '-'}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{detailTalent.appearance?.ethnicity || '-'}</Text>
                   </View>
                 </View>
               </Card>
 
-              {currentTalent.skills && currentTalent.skills.length > 0 && (
+              {detailTalent.skills && detailTalent.skills.length > 0 && (
                 <Card style={styles.detailCard}>
                   <Text style={styles.detailSectionTitle}>Skills</Text>
                   <View style={styles.detailSkills}>
-                    {currentTalent.skills.map((skill, i) => (
+                    {detailTalent.skills.map((skill, i) => (
                       <View key={i} style={styles.detailSkillChip}>
                         <Text style={styles.detailSkillText}>{skill}</Text>
                       </View>
@@ -491,24 +770,37 @@ export default function BrowseTalentScreen() {
                 </Card>
               )}
 
+              {/* Select/Reject Actions */}
               <View style={styles.detailActions}>
-                <Button
-                  title="Pass"
+                <TouchableOpacity
+                  style={[
+                    styles.detailActionBtn,
+                    styles.detailRejectBtn,
+                    rejectedTalents.has(detailTalent.user_id) && styles.detailActionActive,
+                  ]}
                   onPress={() => {
+                    rejectTalent(detailTalent.user_id);
                     setShowDetail(false);
-                    swipeLeft();
                   }}
-                  variant="outline"
-                  style={styles.detailAction}
-                />
-                <Button
-                  title="Select"
+                >
+                  <Ionicons name="close" size={28} color={COLORS.error} />
+                  <Text style={styles.detailActionText}>Pass</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.detailActionBtn,
+                    styles.detailSelectBtn,
+                    selectedTalents.has(detailTalent.user_id) && styles.detailActionActive,
+                  ]}
                   onPress={() => {
+                    selectTalent(detailTalent.user_id);
                     setShowDetail(false);
-                    swipeRight();
                   }}
-                  style={styles.detailAction}
-                />
+                >
+                  <Ionicons name="checkmark" size={28} color={COLORS.success} />
+                  <Text style={styles.detailActionText}>Select</Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
           </SafeAreaView>
@@ -532,19 +824,49 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  headerTitle: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
-    color: COLORS.primary,
+  counterSection: {
+    alignItems: 'center',
   },
-  filterButton: {
+  counterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
+    backgroundColor: COLORS.primary + '15',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
   },
-  filterButtonText: {
-    fontSize: FONT_SIZES.md,
+  counterText: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: 'bold',
     color: COLORS.primary,
+  },
+  counterLabel: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    padding: 2,
+  },
+  toggleButton: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  toggleButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  filterButton: {
+    padding: SPACING.sm,
   },
   cardsContainer: {
     flex: 1,
@@ -555,7 +877,7 @@ const styles = StyleSheet.create({
   card: {
     position: 'absolute',
     width: SCREEN_WIDTH - SPACING.lg * 2,
-    height: SCREEN_HEIGHT * 0.6,
+    height: SCREEN_HEIGHT * 0.55,
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.xl,
     shadowColor: '#000',
@@ -602,14 +924,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  badgesContainer: {
+    position: 'absolute',
+    top: SPACING.sm,
+    left: SPACING.sm,
+    gap: SPACING.xs,
+  },
+  captainBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.round,
+  },
+  captainText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    color: '#FFD700',
+    marginLeft: 4,
+  },
   cardInfo: {
     padding: SPACING.md,
   },
+  nameRatingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
   talentName: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.lg,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: SPACING.sm,
   },
   statsRow: {
     flexDirection: 'row',
@@ -625,22 +972,6 @@ const styles = StyleSheet.create({
   statText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
-  },
-  skillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-    marginBottom: SPACING.sm,
-  },
-  skillChip: {
-    backgroundColor: COLORS.primary + '15',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.round,
-  },
-  skillText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.primary,
   },
   viewMore: {
     flexDirection: 'row',
@@ -704,10 +1035,211 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     textAlign: 'center',
   },
-  resetButton: {
-    marginTop: SPACING.lg,
+  selectionSummary: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginTop: SPACING.md,
   },
-  modalContainer: {
+  // Thumbnail View
+  thumbnailGrid: {
+    padding: SPACING.md,
+  },
+  thumbnailWrapper: {
+    width: THUMBNAIL_SIZE,
+    marginRight: SPACING.md,
+    marginBottom: SPACING.md,
+    alignItems: 'center',
+  },
+  thumbnail: {
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  thumbnailSelected: {
+    borderColor: COLORS.success,
+    borderWidth: 3,
+  },
+  thumbnailRejected: {
+    borderColor: COLORS.error,
+    borderWidth: 3,
+    opacity: 0.5,
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  thumbnailPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  selectionBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+  },
+  thumbnailCaptain: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
+    padding: 2,
+  },
+  thumbnailName: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  // Send FAB
+  sendFab: {
+    position: 'absolute',
+    bottom: 100,
+    right: SPACING.md,
+    backgroundColor: COLORS.primary,
+    borderRadius: 28,
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  sendFabText: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: COLORS.error,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    fontSize: FONT_SIZES.xs,
+    fontWeight: 'bold',
+    color: COLORS.textLight,
+    textAlign: 'center',
+    lineHeight: 24,
+    overflow: 'hidden',
+  },
+  // Modals
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  targetModal: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xl,
+    width: SCREEN_WIDTH * 0.8,
+  },
+  targetModalTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  targetInput: {
+    marginBottom: SPACING.lg,
+    textAlign: 'center',
+    fontSize: FONT_SIZES.xl,
+  },
+  completionModal: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xl,
+    width: SCREEN_WIDTH * 0.85,
+    alignItems: 'center',
+  },
+  completionTitle: {
+    fontSize: FONT_SIZES.title,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginTop: SPACING.md,
+  },
+  completionText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+  },
+  completionCounter: {
+    backgroundColor: COLORS.primary + '15',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginTop: SPACING.lg,
+    alignItems: 'center',
+  },
+  completionCounterText: {
+    fontSize: FONT_SIZES.title,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  completionCounterLabel: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
+  completionHint: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.warning,
+    marginTop: SPACING.md,
+    textAlign: 'center',
+  },
+  completionActions: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginTop: SPACING.xl,
+    width: '100%',
+  },
+  completionAction: {
+    flex: 1,
+  },
+  sendModal: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xl,
+    width: SCREEN_WIDTH * 0.85,
+    alignItems: 'center',
+  },
+  sendModalTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: 'bold',
+    color: COLORS.text,
+    marginTop: SPACING.md,
+  },
+  sendModalText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+  },
+  sendModalActions: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginTop: SPACING.xl,
+    width: '100%',
+  },
+  sendModalAction: {
+    flex: 1,
+  },
+  // Filter Modal
+  filterModalContainer: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
@@ -780,26 +1312,44 @@ const styles = StyleSheet.create({
   filterAction: {
     flex: 1,
   },
+  // Detail Modal
   detailPhotos: {
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
   detailPhoto: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
   },
   noDetailPhoto: {
     backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  detailHeader: {
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
   detailName: {
     fontSize: FONT_SIZES.title,
     fontWeight: 'bold',
     color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
+  },
+  detailCaptainBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFD70020',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.round,
+    marginVertical: SPACING.sm,
+  },
+  detailCaptainText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: '#B8860B',
+    marginLeft: 4,
   },
   detailCard: {
     marginBottom: SPACING.md,
@@ -845,11 +1395,38 @@ const styles = StyleSheet.create({
   },
   detailActions: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    justifyContent: 'center',
+    gap: SPACING.xl,
     marginTop: SPACING.lg,
     marginBottom: SPACING.xxl,
   },
-  detailAction: {
-    flex: 1,
+  detailActionBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  detailRejectBtn: {
+    borderWidth: 2,
+    borderColor: COLORS.error,
+  },
+  detailSelectBtn: {
+    borderWidth: 2,
+    borderColor: COLORS.success,
+  },
+  detailActionActive: {
+    backgroundColor: COLORS.primary + '15',
+  },
+  detailActionText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginTop: 4,
   },
 });
