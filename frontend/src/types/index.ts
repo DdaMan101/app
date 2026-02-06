@@ -65,6 +65,8 @@ export interface TalentProfile {
   emergency_contact?: Record<string, string>;
   // Star rating (1-5, default 3 for new talents)
   star_rating?: number;
+  // Captain status (admin-controlled)
+  is_captain?: boolean;
   // Referral tracking
   referrer_1_id?: string;
   referrer_1_name?: string;
