@@ -1006,7 +1006,7 @@ async def get_all_users(role: Optional[str] = None, user: dict = Depends(get_cur
     # Remove passwords
     for u in users:
         u.pop("password", None)
-    return users
+    return clean_doc(users)
 
 @api_router.put("/admin/users/{user_id}/status")
 async def update_user_status(user_id: str, is_active: bool, user: dict = Depends(get_current_user)):
@@ -1041,7 +1041,7 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
         "pending_payments": pending_payments,
         "disputed_payments": disputed_payments,
         "unread_messages": unread_messages,
-        "recent_jobs": recent_jobs
+        "recent_jobs": clean_doc(recent_jobs)
     }
 
 # ===================== SEED DATA =====================
