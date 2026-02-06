@@ -926,7 +926,7 @@ async def get_messages(unread_only: bool = False, user: dict = Depends(get_curre
         filter_query["is_read"] = False
     
     messages = await db.messages.find(filter_query).sort("created_at", -1).to_list(1000)
-    return messages
+    return clean_doc(messages)
 
 @api_router.get("/messages/{message_id}")
 async def get_message(message_id: str, user: dict = Depends(get_current_user)):
@@ -942,7 +942,7 @@ async def get_message(message_id: str, user: dict = Depends(get_current_user)):
         await db.messages.update_one({"id": message_id}, {"$set": {"is_read": True}})
         message["is_read"] = True
     
-    return message
+    return clean_doc(message)
 
 @api_router.get("/messages/unread/count")
 async def get_unread_count(user: dict = Depends(get_current_user)):
