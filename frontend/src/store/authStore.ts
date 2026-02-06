@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 import api from '../api/client';
 import { User, UserRole } from '../types';
 
@@ -52,6 +53,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     await AsyncStorage.removeItem('auth_token');
     await AsyncStorage.removeItem('user');
     set({ user: null, token: null, isAuthenticated: false });
+    // Navigate to home after logout
+    router.replace('/');
   },
 
   loadAuth: async () => {
