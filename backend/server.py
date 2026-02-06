@@ -1190,9 +1190,36 @@ import random
 
 @api_router.post("/talent/generate-code")
 async def generate_referral_code(user: dict = Depends(get_current_user)):
-    """Talent generates a 4-digit referral code to share"""
+    """Talent generates a 4-digit referral code to share - limited to 1 per week"""
     if user["role"] != UserRole.TALENT.value:
         raise HTTPException(status_code=403, detail="Only talents can generate referral codes")
+    
+    # Check if user has generated a code in the last 7 days
+    one_week_ago = datetime.utcnow() - timedelta(days=7)
+    recent_code = await db.referral_codes.find_one({
+        "generated_by_id": user["id"],
+        "created_at": {"$gte": one_week_ago}
+    })
+    
+    if recent_code:
+        # Calculate when they can generate next
+        code_created = recent_code["created_at"]
+        if isinstance(code_created, str):
+            code_created = datetime.fromisoformat(code_created.replace('Z', '+00:00'))
+        next_available = code_created + timedelta(days=7)
+        days_left = (next_available - datetime.utcnow()).days
+        hours_left = int((next_available - datetime.utcnow()).seconds / 3600)
+        
+        if days_left > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"You can only generate 1 code per week. Try again in {days_left} day(s)."
+            )
+        elif hours_left > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"You can only generate 1 code per week. Try again in {hours_left} hour(s)."
+            )
     
     # Generate unique 4-digit code
     while True:
@@ -1209,9 +1236,14 @@ async def generate_referral_code(user: dict = Depends(get_current_user)):
     
     await db.referral_codes.insert_one(referral.dict())
     
+    talent_name = f"{user['first_name']} {user['last_name']}"
+    
     return {
         "code": code,
-        "message": f"Share this code with someone who wants to join. Code: {code}"
+        "generated_by_name": talent_name,
+        "message": f"{talent_name} thinks you are good enough to join us. Use this code with one other on the login page.",
+        "email_subject": "You've been invited to A Few Good Men Casting!",
+        "email_body": f"{talent_name} thinks you are good enough to join us.\n\nUse this code: {code}\n\nYou'll need this code along with one other from a different talent to complete your registration.\n\nVisit our app to get started!"
     }
 
 @api_router.get("/talent/my-codes")
