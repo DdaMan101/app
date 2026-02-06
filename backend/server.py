@@ -505,7 +505,7 @@ async def get_all_talents(
             profile["user_first_name"] = user_info["first_name"]
             profile["user_last_name"] = user_info["last_name"]
             profile["user_phone"] = user_info.get("phone")
-            result.append(profile)
+            result.append(clean_doc(profile))
     
     return result
 
@@ -523,7 +523,7 @@ async def get_talent_by_id(talent_id: str, user: dict = Depends(get_current_user
         profile["user_last_name"] = user_info["last_name"]
         profile["user_phone"] = user_info.get("phone")
     
-    return profile
+    return clean_doc(profile)
 
 # ===================== AVAILABILITY ROUTES =====================
 
@@ -533,7 +533,7 @@ async def get_my_availability(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only talents can access this")
     
     unavailable = await db.unavailable_dates.find({"talent_id": user["id"]}).to_list(1000)
-    return unavailable
+    return clean_doc(unavailable)
 
 @api_router.post("/talent/availability")
 async def add_unavailable_date(date_data: UnavailableDateCreate, user: dict = Depends(get_current_user)):
