@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""
+Backend API Testing for A Few Good Men Casting - Referral Code System
+Tests the referral code generation, validation, and star rating functionality
+"""
+
+import requests
+import json
+import sys
+from datetime import datetime
+
+# Use the production URL from frontend/.env
+BASE_URL = "https://afgmc.preview.emergentagent.com/api"
+
+class Colors:
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+
+def print_success(message):
+    print(f"{Colors.GREEN}✅ {message}{Colors.ENDC}")
+
+def print_error(message):
+    print(f"{Colors.RED}❌ {message}{Colors.ENDC}")
+
+def print_warning(message):
+    print(f"{Colors.YELLOW}⚠️  {message}{Colors.ENDC}")
+
+def print_info(message):
+    print(f"{Colors.BLUE}ℹ️  {message}{Colors.ENDC}")
+
+def print_header(message):
+    print(f"\n{Colors.BOLD}{Colors.BLUE}{'='*60}{Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.BLUE}{message}{Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.BLUE}{'='*60}{Colors.ENDC}")
+
+class APITester:
+    def __init__(self):
+        self.session = requests.Session()
+        self.talent_token = None
+        self.admin_token = None
+        self.talent_user_id = None
+        self.admin_user_id = None
+        self.generated_code = None
+        self.test_results = {
+            "login_talent": False,
+            "generate_code": False,
+            "weekly_limit": False,
+            "get_my_codes": False,
+            "validate_codes": False,
+            "login_admin": False,
+            "update_rating": False
+        }
+
+    def make_request(self, method, endpoint, data=None, headers=None, token=None):
+        """Make HTTP request with proper error handling"""
+        url = f"{BASE_URL}{endpoint}"
+        
+        if headers is None:
+            headers = {"Content-Type": "application/json"}
+        
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        
+        try:
+            if method.upper() == "GET":
+                response = self.session.get(url, headers=headers)
+            elif method.upper() == "POST":
+                response = self.session.post(url, json=data, headers=headers)
+            elif method.upper() == "PUT":
+                response = self.session.put(url, json=data, headers=headers)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+            
+            print_info(f"{method.upper()} {endpoint} - Status: {response.status_code}")
+            
+            return response
+        except requests.exceptions.RequestException as e:
+            print_error(f"Request failed: {e}")
+            return None
+
+    def test_talent_login(self):
+        """Test 1: Login as talent"""
+        print_header("TEST 1: Talent Login")
+        
+        login_data = {
+            "email": "talent@test.com",
+            "password": "test123"
+        }
+        
+        response = self.make_request("POST", "/auth/login", login_data)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.talent_token = data.get("access_token")
+            self.talent_user_id = data.get("user", {}).get("id")
+            
+            if self.talent_token and self.talent_user_id:
+                print_success(f"Talent login successful")
+                print_info(f"User ID: {self.talent_user_id}")
+                print_info(f"Token: {self.talent_token[:20]}...")
+                self.test_results["login_talent"] = True
+                return True
+            else:
+                print_error("Login response missing token or user ID")
+        else:
+            print_error(f"Talent login failed - Status: {response.status_code if response else 'No response'}")
+            if response:
+                print_error(f"Response: {response.text}")
+        
+        return False
+
+    def test_generate_referral_code(self):
+        """Test 2: Generate referral code"""
+        print_header("TEST 2: Generate Referral Code")
+        
+        if not self.talent_token:
+            print_error("No talent token available")
+            return False
+        
+        response = self.make_request("POST", "/talent/generate-code", token=self.talent_token)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.generated_code = data.get("code")
+            
+            required_fields = ["code", "generated_by_name", "email_subject", "email_body"]
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                print_error(f"Response missing fields: {missing_fields}")
+                return False
+            
+            print_success("Referral code generated successfully")
+            print_info(f"Code: {self.generated_code}")
+            print_info(f"Generated by: {data.get('generated_by_name')}")
+            print_info(f"Email subject: {data.get('email_subject')}")
+            print_info(f"Email body preview: {data.get('email_body')[:50]}...")
+            
+            self.test_results["generate_code"] = True
+            return True
+        else:
+            print_error(f"Code generation failed - Status: {response.status_code if response else 'No response'}")
+            if response:
+                print_error(f"Response: {response.text}")
+        
+        return False
+
+    def test_weekly_limit(self):
+        """Test 3: Test weekly limit by trying to generate another code"""
+        print_header("TEST 3: Weekly Limit Check")
+        
+        if not self.talent_token:
+            print_error("No talent token available")
+            return False
+        
+        response = self.make_request("POST", "/talent/generate-code", token=self.talent_token)
+        
+        if response and response.status_code == 400:
+            data = response.json()
+            error_detail = data.get("detail", "")
+            
+            if "week" in error_detail.lower():
+                print_success("Weekly limit enforced correctly")
+                print_info(f"Error message: {error_detail}")
+                self.test_results["weekly_limit"] = True
+                return True
+            else:
+                print_error(f"Unexpected error message: {error_detail}")
+        else:
+            print_error(f"Expected 400 error, got: {response.status_code if response else 'No response'}")
+            if response:
+                print_error(f"Response: {response.text}")
+        
+        return False
+
+    def test_get_my_codes(self):
+        """Test 4: Get my referral codes"""
+        print_header("TEST 4: Get My Codes")
+        
+        if not self.talent_token:
+            print_error("No talent token available")
+            return False
+        
+        response = self.make_request("GET", "/talent/my-codes", token=self.talent_token)
+        
+        if response and response.status_code == 200:
+            codes = response.json()
+            
+            if isinstance(codes, list):
+                print_success(f"Retrieved {len(codes)} codes")
+                
+                # Check if our generated code is in the list
+                if self.generated_code:
+                    found_code = any(code.get("code") == self.generated_code for code in codes)
+                    if found_code:
+                        print_success("Generated code found in list")
+                        self.test_results["get_my_codes"] = True
+                        return True
+                    else:
+                        print_error("Generated code not found in list")
+                else:
+                    print_warning("No generated code to verify, but API call successful")
+                    self.test_results["get_my_codes"] = True
+                    return True
+            else:
+                print_error("Response is not a list")
+        else:
+            print_error(f"Get codes failed - Status: {response.status_code if response else 'No response'}")
+            if response:
+                print_error(f"Response: {response.text}")
+        
+        return False
+
+    def test_code_validation(self):
+        """Test 5: Code validation scenarios"""
+        print_header("TEST 5: Code Validation")
+        
+        # Test with same code twice (should fail)
+        print_info("Testing with same code twice...")
+        if self.generated_code:
+            validation_data = {
+                "code1": self.generated_code,
+                "code2": self.generated_code
+            }
+            
+            response = self.make_request("POST", "/auth/validate-codes", validation_data)
+            
+            if response and response.status_code == 400:
+                data = response.json()
+                error_detail = data.get("detail", "")
+                if "different people" in error_detail.lower():
+                    print_success("Same code validation correctly rejected")
+                else:
+                    print_warning(f"Unexpected error message: {error_detail}")
+            else:
+                print_error(f"Expected 400 error for same codes, got: {response.status_code if response else 'No response'}")
+        
+        # Test with non-existent codes (should fail)
+        print_info("Testing with non-existent codes...")
+        validation_data = {
+            "code1": "9999",
+            "code2": "8888"
+        }
+        
+        response = self.make_request("POST", "/auth/validate-codes", validation_data)
+        
+        if response and response.status_code == 400:
+            data = response.json()
+            error_detail = data.get("detail", "")
+            if "invalid" in error_detail.lower() or "already used" in error_detail.lower():
+                print_success("Invalid codes correctly rejected")
+                self.test_results["validate_codes"] = True
+                return True
+            else:
+                print_warning(f"Unexpected error message: {error_detail}")
+        else:
+            print_error(f"Expected 400 error for invalid codes, got: {response.status_code if response else 'No response'}")
+            if response:
+                print_error(f"Response: {response.text}")
+        
+        return False
+
+    def test_admin_login(self):
+        """Test 6: Login as admin"""
+        print_header("TEST 6: Admin Login")
+        
+        login_data = {
+            "email": "admin@test.com",
+            "password": "test123"
+        }
+        
+        response = self.make_request("POST", "/auth/login", login_data)
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.admin_token = data.get("access_token")
+            self.admin_user_id = data.get("user", {}).get("id")
+            
+            if self.admin_token and self.admin_user_id:
+                print_success("Admin login successful")
+                print_info(f"Admin ID: {self.admin_user_id}")
+                print_info(f"Token: {self.admin_token[:20]}...")
+                self.test_results["login_admin"] = True
+                return True
+            else:
+                print_error("Admin login response missing token or user ID")
+        else:
+            print_error(f"Admin login failed - Status: {response.status_code if response else 'No response'}")
+            if response:
+                print_error(f"Response: {response.text}")
+        
+        return False
+
+    def test_update_talent_rating(self):
+        """Test 7: Update talent star rating as admin"""
+        print_header("TEST 7: Update Talent Rating")
+        
+        if not self.admin_token:
+            print_error("No admin token available")
+            return False
+        
+        if not self.talent_user_id:
+            print_error("No talent user ID available")
+            return False
+        
+        # Test updating rating to 5 stars
+        rating = 5
+        response = self.make_request(
+            "PUT", 
+            f"/admin/talent/{self.talent_user_id}/rating?rating={rating}", 
+            token=self.admin_token
+        )
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            message = data.get("message", "")
+            
+            if str(rating) in message:
+                print_success(f"Rating updated successfully to {rating} stars")
+                print_info(f"Response: {message}")
+                self.test_results["update_rating"] = True
+                return True
+            else:
+                print_error(f"Unexpected response message: {message}")
+        else:
+            print_error(f"Rating update failed - Status: {response.status_code if response else 'No response'}")
+            if response:
+                print_error(f"Response: {response.text}")
+        
+        return False
+
+    def run_all_tests(self):
+        """Run all tests in sequence"""
+        print_header("REFERRAL CODE SYSTEM TESTING")
+        print_info(f"Testing against: {BASE_URL}")
+        print_info(f"Timestamp: {datetime.now().isoformat()}")
+        
+        # Run tests in order
+        tests = [
+            ("Talent Login", self.test_talent_login),
+            ("Generate Referral Code", self.test_generate_referral_code),
+            ("Weekly Limit Check", self.test_weekly_limit),
+            ("Get My Codes", self.test_get_my_codes),
+            ("Code Validation", self.test_code_validation),
+            ("Admin Login", self.test_admin_login),
+            ("Update Talent Rating", self.test_update_talent_rating)
+        ]
+        
+        for test_name, test_func in tests:
+            try:
+                test_func()
+            except Exception as e:
+                print_error(f"Test '{test_name}' crashed: {e}")
+            print()  # Add spacing between tests
+        
+        # Print summary
+        self.print_summary()
+
+    def print_summary(self):
+        """Print test results summary"""
+        print_header("TEST RESULTS SUMMARY")
+        
+        passed = sum(1 for result in self.test_results.values() if result)
+        total = len(self.test_results)
+        
+        for test_name, result in self.test_results.items():
+            status = "PASS" if result else "FAIL"
+            color = Colors.GREEN if result else Colors.RED
+            print(f"{color}{status:>6}{Colors.ENDC} - {test_name.replace('_', ' ').title()}")
+        
+        print(f"\n{Colors.BOLD}Overall: {passed}/{total} tests passed{Colors.ENDC}")
+        
+        if passed == total:
+            print_success("All tests passed! ✨")
+            return True
+        else:
+            print_error(f"{total - passed} tests failed")
+            return False
+
+def main():
+    """Main test execution"""
+    tester = APITester()
+    success = tester.run_all_tests()
+    
+    # Exit with appropriate code
+    sys.exit(0 if success else 1)
+
+if __name__ == "__main__":
+    main()
