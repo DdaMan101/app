@@ -101,3 +101,116 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Build a three-sided mobile app for "A Few Good Men Casting" talent agency with:
+  1. Talent Portal - Profile management, availability calendar, bookings, payments
+  2. Production Portal - Browse talents, Tinder-style selection, job creation
+  3. Admin Portal - Manage jobs, payments, messaging, talent ratings
+  4. Referral system - Talents need 2 codes from existing talents to register
+  5. Star rating system - 5-star ratings visible to Admin and Production
+
+backend:
+  - task: "Referral Code Generation with Weekly Limit"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented weekly limit - talents can only generate 1 code per week"
+
+  - task: "Referral Code Validation"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Validates two codes from different talents"
+
+  - task: "Talent Registration with Codes"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Registers new talent with referrer tracking and 3-star initial rating"
+
+  - task: "Star Rating Update (Admin)"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Admin can update talent star ratings (1-5)"
+
+frontend:
+  - task: "Refer a Friend Screen"
+    implemented: true
+    working: "NA"
+    file: "app/(talent)/refer.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created screen with code generation, email sharing, and history view"
+
+  - task: "Enter Codes Screen"
+    implemented: true
+    working: "NA"
+    file: "app/(auth)/enter-codes.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Screen for new talents to enter 2 referral codes"
+
+  - task: "StarRating Component"
+    implemented: true
+    working: "NA"
+    file: "src/components/StarRating.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Reusable star rating component with editable mode"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Referral Code Generation with Weekly Limit"
+    - "Referral Code Validation"
+    - "Talent Registration with Codes"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented referral system with weekly code limit. Backend endpoints: POST /talent/generate-code, POST /auth/validate-codes, POST /auth/register-talent. Created refer.tsx screen for talents to generate codes and share via email. Please test backend endpoints first."
