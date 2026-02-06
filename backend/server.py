@@ -855,7 +855,7 @@ async def get_rates(agreement_type: Optional[str] = None, user: dict = Depends(g
         filter_query["agreement_type"] = agreement_type
     
     rates = await db.rates.find(filter_query).to_list(1000)
-    return rates
+    return clean_doc(rates)
 
 @api_router.post("/rates")
 async def create_rate(rate_data: RateStructure, user: dict = Depends(get_current_user)):
