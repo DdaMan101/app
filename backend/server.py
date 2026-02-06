@@ -821,7 +821,7 @@ async def get_payments(
         if talent_user:
             payment["talent_name"] = f"{talent_user['first_name']} {talent_user['last_name']}"
     
-    return payments
+    return clean_doc(payments)
 
 @api_router.get("/payments/{payment_id}")
 async def get_payment(payment_id: str, user: dict = Depends(get_current_user)):
@@ -843,7 +843,7 @@ async def get_payment(payment_id: str, user: dict = Depends(get_current_user)):
     if talent_user:
         payment["talent_name"] = f"{talent_user['first_name']} {talent_user['last_name']}"
     
-    return payment
+    return clean_doc(payment)
 
 @api_router.put("/payments/{payment_id}/status")
 async def update_payment_status(payment_id: str, status: PaymentStatus, user: dict = Depends(get_current_user)):
