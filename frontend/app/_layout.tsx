@@ -20,19 +20,22 @@ export default function RootLayout() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inRoleGroup = ['(talent)', '(production)', '(admin)'].includes(segments[0] as string);
 
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
+    if (isAuthenticated && user) {
       // Redirect to appropriate dashboard based on role
-      if (user?.role === 'talent') {
-        router.replace('/(talent)/dashboard');
-      } else if (user?.role === 'production') {
-        router.replace('/(production)/browse');
-      } else if (user?.role === 'admin') {
-        router.replace('/(admin)/dashboard');
+      if (inAuthGroup || segments[0] === undefined || segments.length === 0) {
+        if (user.role === 'talent') {
+          router.replace('/(talent)/dashboard');
+        } else if (user.role === 'production') {
+          router.replace('/(production)/browse');
+        } else if (user.role === 'admin') {
+          router.replace('/(admin)/dashboard');
+        }
       }
+    } else if (!isAuthenticated && inRoleGroup) {
+      // Not authenticated but trying to access protected route
+      router.replace('/');
     }
   }, [isLoading, isAuthenticated, segments, user]);
 
