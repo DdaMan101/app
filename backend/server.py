@@ -594,14 +594,14 @@ async def get_jobs(status: Optional[str] = None, user: dict = Depends(get_curren
         filter_query["status"] = status
     
     jobs = await db.jobs.find(filter_query).sort("created_at", -1).to_list(1000)
-    return jobs
+    return clean_doc(jobs)
 
 @api_router.get("/jobs/{job_id}")
 async def get_job(job_id: str, user: dict = Depends(get_current_user)):
     job = await db.jobs.find_one({"id": job_id})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
+    return clean_doc(job)
 
 @api_router.put("/jobs/{job_id}")
 async def update_job(job_id: str, update_data: dict, user: dict = Depends(get_current_user)):
