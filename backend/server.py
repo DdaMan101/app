@@ -1407,6 +1407,22 @@ async def update_talent_rating(talent_id: str, rating: int, user: dict = Depends
     
     return {"message": f"Rating updated to {rating} stars"}
 
+@api_router.put("/admin/talent/{talent_id}/captain")
+async def update_talent_captain_status(talent_id: str, is_captain: bool, user: dict = Depends(get_current_user)):
+    """Admin updates a talent's captain status (Yes/No)"""
+    if user["role"] != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="Only admin can update captain status")
+    
+    result = await db.talent_profiles.update_one(
+        {"user_id": talent_id},
+        {"$set": {"is_captain": is_captain, "updated_at": datetime.utcnow()}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Talent profile not found")
+    
+    return {"message": f"Captain status updated to {'Yes' if is_captain else 'No'}"}
+
 @api_router.get("/talent/{talent_id}/referrers")
 async def get_talent_referrers(talent_id: str, user: dict = Depends(get_current_user)):
     """Get who referred this talent - Admin only"""
