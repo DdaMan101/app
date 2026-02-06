@@ -147,6 +147,14 @@ export default function TalentDashboard() {
               <Text style={styles.actionText}>Payments</Text>
             </TouchableOpacity>
           </View>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(talent)/refer')}>
+              <View style={[styles.actionIcon, { backgroundColor: COLORS.info + '15' }]}>
+                <Ionicons name="gift" size={24} color={COLORS.info} />
+              </View>
+              <Text style={styles.actionText}>Refer a Friend</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
