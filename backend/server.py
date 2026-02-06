@@ -448,6 +448,9 @@ async def get_my_talent_profile(user: dict = Depends(get_current_user)):
         # Create profile if doesn't exist
         profile = TalentProfile(user_id=user["id"]).dict()
         await db.talent_profiles.insert_one(profile)
+        profile = await db.talent_profiles.find_one({"user_id": user["id"]})
+    
+    profile = clean_doc(profile)
     
     # Add user info
     profile["user_email"] = user["email"]
