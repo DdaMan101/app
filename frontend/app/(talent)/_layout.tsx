@@ -85,13 +85,3 @@ export default function TalentLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  headerRight: {
-    marginRight: SPACING.md,
-  },
-  logo: {
-    width: 45,
-    height: 36,
-  },
-});
