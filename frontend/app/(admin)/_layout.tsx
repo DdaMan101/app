@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
-import { View, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING } from '../../src/constants/theme';
+import { COLORS } from '../../src/constants/theme';
+import { HeaderRight } from '../../src/components/HeaderRight';
 
 export default function AdminLayout() {
   return (
@@ -24,15 +24,7 @@ export default function AdminLayout() {
           fontWeight: 'bold',
           color: COLORS.secondary,
         },
-        headerRight: () => (
-          <View style={styles.headerRight}>
-            <Image
-              source={require('../../assets/logo.jpeg')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-        ),
+        headerRight: () => <HeaderRight showNotifications={true} />,
       }}
     >
       <Tabs.Screen
@@ -92,13 +84,3 @@ export default function AdminLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  headerRight: {
-    marginRight: SPACING.md,
-  },
-  logo: {
-    width: 45,
-    height: 36,
-  },
-});
